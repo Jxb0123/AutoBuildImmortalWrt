@@ -4,7 +4,7 @@
 LOGFILE="/etc/config/uci-defaults-log.txt"
 echo "Starting 99-custom.sh at $(date)" >>$LOGFILE
 # 设置默认防火墙规则，方便单网口虚拟机首次访问 WebUI 
-# 因为本项目中 单网口模式是dhcp模式 直接就能上网并且访问web界面 避免新手每次都要修改/etc/config/network中的静态ip
+# 因为本项目中 单网口模式是静态IP模式 避免新手每次都要修改/etc/config/network中的静态ip
 # 当你刷机运行后 都调整好了 你完全可以在web页面自行关闭 wan口防火墙的入站数据
 # 具体操作方法：网络——防火墙 在wan的入站数据 下拉选项里选择 拒绝 保存并应用即可。
 uci set firewall.@zone[1].input='ACCEPT'
@@ -60,13 +60,27 @@ esac
 
 # 3. 配置网络
 if [ "$count" -eq 1 ]; then
-    # 单网口设备，DHCP模式
-    uci set network.lan.proto='dhcp'
-    uci delete network.lan.ipaddr
-    uci delete network.lan.netmask
-    uci delete network.lan.gateway
-    uci delete network.lan.dns
+    # 单网口设备，静态IP模式
+    uci set network.lan.proto='static'
+    
+    # 设置静态IP地址
+    IP_VALUE_FILE="/etc/config/custom_router_ip.txt"
+    if [ -f "$IP_VALUE_FILE" ]; then
+        CUSTOM_IP=$(cat "$IP_VALUE_FILE")
+        uci set network.lan.ipaddr=$CUSTOM_IP
+        echo "Single port custom router ip is $CUSTOM_IP" >> $LOGFILE
+    else
+        uci set network.lan.ipaddr='192.168.1.1'  # 默认静态IP
+        echo "Single port default router ip is 192.168.1.1" >> $LOGFILE
+    fi
+    
+    uci set network.lan.netmask='255.255.255.0'
+    # 单网口设备通常不需要设置网关和DNS
+    uci delete network.lan.gateway 2>/dev/null
+    uci delete network.lan.dns 2>/dev/null
+    
     uci commit network
+    echo "Single port configured with static IP" >> $LOGFILE
 elif [ "$count" -gt 1 ]; then
     # 多网口设备配置
     # 配置WAN
